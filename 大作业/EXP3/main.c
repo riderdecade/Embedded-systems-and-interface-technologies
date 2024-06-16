@@ -16,6 +16,8 @@
 #include "hw_ints.h"
 #include "string.h"
 #include "pwm.h"
+#include "eeprom.h"
+
 
 #define SYSTICK_FREQUENCY		1000			//1000hz
 
@@ -89,6 +91,8 @@ uint8_t name[] = {0x67,0x0f,0x77,0x54,0x3d,0x78,0x77,0x5c};
 int month_num[12]={31,28,31,30,31,30,31,31,30,31,30,31}; // month
 
 uint8_t year=24,month=6,day=16,hour=12,minute=0,second=0,alarm_hour=11,alarm_minute=59,alarm_second=59;
+uint32_t s_time[10],r_time[10];
+uint32_t ui32EEPROMInit;
 
 int func = -1;								//功能选择
 int Delay_time_date = 200;
@@ -148,6 +152,26 @@ int main(void)
 	IntEnable(INT_UART0);
   UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);	//Enable UART0 RX,TX interrupt
   IntMasterEnable();		
+	
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_EEPROM0);
+	//
+	// Wait for the EEPROM module to be ready.
+	//
+	while(!SysCtlPeripheralReady(SYSCTL_PERIPH_EEPROM0)){}
+	//
+	// Wait for the EEPROM Initialization to complete
+	//
+	ui32EEPROMInit = EEPROMInit();
+	//
+	// Check if the EEPROM Initialization returned an error
+	// and inform the application
+	//
+	if(ui32EEPROMInit != EEPROM_INIT_OK)
+	{
+		while(1)
+		{
+		}
+	}
 	
 	reset();
 	
@@ -829,15 +853,16 @@ void reset(void)                     //重启
 	int i = 0,j = 0;	
 	int StuID=31910206;
 	int cnt1=0;
-	year=24;
-	month=6;
-	day=16;
-	hour=12;
-	minute=0;
-	second=0;
-	alarm_hour=11;
-	alarm_minute=59;
-	alarm_second=59;
+	EEPROMRead(r_time, 0x400, sizeof(r_time));
+	year=r_time[0];
+	month=r_time[1];
+	day=r_time[2];
+	hour=r_time[3];
+	minute=r_time[4];
+	second=r_time[5];
+	alarm_hour=r_time[6];
+	alarm_minute=r_time[7];
+	alarm_second=r_time[8];
 	Count_time=0;
 	for(j=0;j<420;j++)
 	{
@@ -1080,6 +1105,16 @@ void SysTick_Handler(void)
 			second=second+1;
 			Count_time=0;
 			jingwei();
+			s_time[0]=year;
+			s_time[1]=month;
+			s_time[2]=day;
+			s_time[3]=hour;
+			s_time[4]=minute;
+			s_time[5]=second;
+			s_time[6]=alarm_hour;
+			s_time[7]=alarm_minute;
+			s_time[8]=alarm_second;
+			EEPROMProgram(s_time, 0x400, sizeof(s_time));
 		}
 	}
 	if(func!=5)
